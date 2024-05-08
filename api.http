@@ -1,0 +1,11 @@
+### Listar todos os sensores
+GET https://smartparking-api.vercel.app/sensors
+
+### Atualizar informações de um sensor
+PUT https://smartparking-api.vercel.app/sensors/rua_campo_sales_vg1
+Content-Type: application/json
+
+{
+    "status": false
+}
+
