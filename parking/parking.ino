@@ -1,7 +1,7 @@
 
 #include "parking.h"
 
-#include <HTTPClient.h>
+#include <PubSubClient.h>
 
 LiquidCrystal_I2C lcd(lcd_addr, lcd_cols, lcd_rows);
 
@@ -18,6 +18,12 @@ const long samplingInterval = 1000;
 const char *ntpServer = "pool.ntp.org";
 const long gmtOffsetInSeconds = -14400;
 const int daylightOffsetSeconds = 3600;
+
+const char *mqtt_host = "broker.emqx.io";
+const char *mqtt_topic = "smartparking-iot";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
 
 struct Sensor {
   char* name;
@@ -68,6 +74,21 @@ void loop()
   handleLocalTime();
 }
 
+void verifyBrokerConnection() {
+  if (!client.connected())
+  {
+    client.setServer(mqtt_host, 1883);
+    if (client.connect("smartparking-iot"))
+    {
+      Serial.println("Conectado ao broker MQTT");
+    }
+    else
+    {
+      Serial.println("Falha ao conectar ao broker MQTT");
+    }
+  }
+}
+
 void verifyWifiConnection() {
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -89,22 +110,14 @@ bool updateSensorStatus(int sensorIndex, bool status)
     return false;
   }
 
-  HTTPClient http;
-  String url = "https://smartparking-api.vercel.app/sensors/" + String(sensors[sensorIndex].name);
+  verifyBrokerConnection();
 
-  String statusCode = status ? "true" : "false";
+  String payload = "{\"sensor\": \"" + String(sensors[sensorIndex].name) + "\", \"status\": " + String(status) + "}";
+  client.publish(mqtt_topic, payload.c_str());
 
-  http.begin(url);
-  http.addHeader("Content-Type", "application/json");
-  String body = "{\"status\": " + String(statusCode) + "}";
-  int httpCode = http.PUT(body);
-  http.end();
+  Serial.println("Mensagem enviada: " + payload);
 
-  Serial.println("URL: " + url);
-  Serial.println("HTTP Code: " + String(httpCode));
-  Serial.println("Body: " + body);
-
-  return httpCode == 200;
+  return true;
 }
 
 void handleLocalTime() {
